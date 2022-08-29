@@ -1,4 +1,4 @@
-package provider
+package minimal
 
 import "github.com/labstack/echo/v4"
 

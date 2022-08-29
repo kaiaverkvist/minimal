@@ -1,4 +1,4 @@
-package database
+package minimal
 
 import (
 	"fmt"
