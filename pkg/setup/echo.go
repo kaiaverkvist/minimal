@@ -2,12 +2,13 @@ package setup
 
 import (
 	"crypto/tls"
+	"net/http"
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
-	"net/http"
-	"time"
 )
 
 func Start(e *echo.Echo, port string, autoTls bool, cert string, pkey string, domains []string) {
@@ -28,10 +29,12 @@ func startInsecure(e *echo.Echo, port string) {
 }
 
 func startAutoTLS(e *echo.Echo, port string, cert string, pkey string, domains []string) {
+	dirCache := autocert.DirCache("/var/www/.cache")
+	e.AutoTLSManager.Cache = dirCache
 	autoTLSManager := autocert.Manager{
 		Prompt: autocert.AcceptTOS,
 		// Cache certificates to avoid issues with rate limits (https://letsencrypt.org/docs/rate-limits)
-		Cache:      autocert.DirCache("/var/www/.cache"),
+		Cache:      dirCache,
 		HostPolicy: autocert.HostWhitelist(domains...),
 	}
 	s := http.Server{
