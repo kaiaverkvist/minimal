@@ -1,4 +1,4 @@
-package minimal
+package setup
 
 type Config struct {
 	DSN string

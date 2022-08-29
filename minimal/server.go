@@ -3,6 +3,7 @@ package minimal
 import (
 	"fmt"
 	renderer "github.com/kaiaverkvist/echo-jet-template-renderer"
+	"github.com/kaiaverkvist/minimal/database"
 	setup2 "github.com/kaiaverkvist/minimal/setup"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
@@ -19,7 +20,7 @@ type Server struct {
 	models []any
 
 	// Server configuration
-	config Config
+	config setup2.Config
 }
 
 /*
@@ -58,7 +59,7 @@ This is a 'minimal' example of how to configure the library:
 		s.Init(embedFS(embeddedFiles))
 	}
 */
-func New(config Config, routes []Provider, models []any) Server {
+func New(config setup2.Config, routes []Provider, models []any) Server {
 	return Server{
 		e: echo.New(),
 
@@ -72,7 +73,7 @@ func (s *Server) Init(fs http.FileSystem) {
 	setup2.Logging(s.e, s.config.FriendlyLogging)
 
 	if s.config.DSN != "" {
-		_, err := InitDatabase(s.config.DSN)
+		_, err := database.InitDatabase(s.config.DSN)
 		if err != nil {
 			log.Fatal("Unable to connect to database: ", err)
 			return
@@ -80,7 +81,7 @@ func (s *Server) Init(fs http.FileSystem) {
 
 		// Migrate all the models
 		for _, model := range s.models {
-			AutoMigrate(model)
+			database.AutoMigrate(model)
 		}
 	} else {
 		log.Info("Skipping database setup, no DSN specified")
