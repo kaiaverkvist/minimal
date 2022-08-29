@@ -1,11 +1,11 @@
-package setup
+package server
 
 import (
 	"crypto/tls"
+	"github.com/labstack/echo/v4"
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
