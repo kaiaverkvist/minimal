@@ -21,7 +21,7 @@ func main() {
 	)
 	config.DSN = dsn
 
-	s := server.New(config, []provider.RouteProvider{
+	s := server.New(config, []provider.Provider{
 		&BaseRoutes{},
 	}, []any{})
 
