@@ -13,7 +13,7 @@ func embedFS(fs embed.FS) http.FileSystem {
 
 func main() {
 	config := minimal.DevelopmentConfig
-	_ = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=5432 sslmode=disable TimeZone=Europe/Oslo",
+	dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=5432 sslmode=disable TimeZone=Europe/Oslo",
 		"localhost",
 		"postgres",
 		"postgres",
