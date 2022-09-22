@@ -39,3 +39,6 @@ func (br *BaseRoutes) Register(e *echo.Echo) {
 	})
 }
 ```
+
+## Res package
+Instead of using `c.JSON`, you can use the `res` package which wraps your data type in a general success and failure struct.
