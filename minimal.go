@@ -136,7 +136,10 @@ func (s *Server) Init(fs http.FileSystem) {
 	s.registerRoutes()
 
 	// Sets the Jet renderer up.
-	s.e.Renderer = renderer.NewTemplateRenderer("www", fs)
+	if fs != nil {
+		log.Info("Template rendering has been enabled")
+		s.e.Renderer = renderer.NewTemplateRenderer("www", fs)
+	}
 
 	address := fmt.Sprintf(":%d", s.config.HttpPort)
 	server.Start(s.e, address, s.config.AutoTLS, s.config.CertKeyPath, s.config.CertPrivateKeyPath, s.config.Domains)
