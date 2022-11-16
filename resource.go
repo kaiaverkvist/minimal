@@ -77,6 +77,10 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 		tx := q.First(&result, "id = ?", id)
 
 		if tx.Error != nil {
+			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+				return nil, ErrorNoResourceFound
+			}
+
 			return nil, tx.Error
 		}
 
