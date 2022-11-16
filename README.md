@@ -42,3 +42,40 @@ func (br *BaseRoutes) Register(e *echo.Echo) {
 
 ## Res package
 Instead of using `c.JSON`, you can use the `res` package which wraps your data type in a general success and failure struct.
+
+## Auto-generated API Resource
+The snippet below will set up
+````go
+type UpdateTest struct {
+	Name        string
+	Description string
+}
+
+type Test struct {
+	repository.BaseModel
+
+	Name        string
+	Description string
+}
+
+type TestResource struct {
+	minimal.Resource[Test]
+}
+
+func NewTestResource() *TestResource {
+	api := TestResource{
+		minimal.Resource[Test]{
+			Name: "tests",
+		},
+	}
+
+	api.SetWriteBindType(&UpdateTest{})
+	api.SetCreateBindType(&UpdateTest{})
+
+	api.CanDeleteById(func(c echo.Context) bool {
+		return false
+	})
+
+	return &api
+}
+````

@@ -3,6 +3,7 @@ module github.com/kaiaverkvist/minimal
 go 1.18
 
 require (
+	github.com/geraldo-labs/merge-struct v1.0.0
 	github.com/kaiaverkvist/echo-jet-template-renderer v1.0.0
 	github.com/labstack/echo/v4 v4.7.2
 	github.com/labstack/gommon v0.3.1
@@ -17,6 +18,7 @@ require (
 	github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 // indirect
 	github.com/CloudyKit/jet/v6 v6.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/fatih/structs v1.1.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.10.1 // indirect
