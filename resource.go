@@ -35,21 +35,21 @@ type Resource[T any] struct {
 	listAllQuery func(q *gorm.DB) ([]T, error)
 
 	// List by ID operation.
-	canListById   func(c echo.Context) bool
-	listByIdQuery func(q *gorm.DB, id uint) (*T, error)
+	canListById   func(c echo.Context, entity T) bool
+	listByIdQuery func(c echo.Context, q *gorm.DB, id uint) (*T, error)
 
 	// Write by ID operation.
-	canWriteById   func(c echo.Context) bool
+	canWriteById   func(c echo.Context, entity T) bool
 	writeBindType  any
-	writeByIdQuery func(q *gorm.DB, id uint, new any) error
+	writeByIdQuery func(c echo.Context, q *gorm.DB, id uint, new any) error
 
 	// Create operation.
 	canCreate      func(c echo.Context) bool
 	createBindType any
 
 	// Delete by ID operation.
-	canDeleteById   func(c echo.Context) bool
-	deleteByIdQuery func(q *gorm.DB, id uint) error
+	canDeleteById   func(c echo.Context, entity T) bool
+	deleteByIdQuery func(c echo.Context, q *gorm.DB, id uint) error
 }
 
 // Register is called when minimal initializes, and will add routes and trigger the automigration.
@@ -72,9 +72,16 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 	}
 
 	// Default for list by id
-	r.listByIdQuery = func(q *gorm.DB, id uint) (*T, error) {
+	r.listByIdQuery = func(c echo.Context, q *gorm.DB, id uint) (*T, error) {
 		var result T
 		tx := q.First(&result, "id = ?", id)
+
+		// Access control check
+		if r.canListById != nil {
+			if !r.canListById(c, result) {
+				return nil, ErrorNoResourceAccess
+			}
+		}
 
 		if tx.Error != nil {
 			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -87,9 +94,15 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 		return &result, nil
 	}
 
-	r.writeByIdQuery = func(q *gorm.DB, id uint, new any) error {
+	r.writeByIdQuery = func(c echo.Context, q *gorm.DB, id uint, new any) error {
 		var result T
 		tx := q.First(&result, "id = ?", id)
+
+		if r.canWriteById != nil {
+			if !r.canWriteById(c, result) {
+				return ErrorNoResourceAccess
+			}
+		}
 
 		_, err := patch.Struct(&result, new)
 		if err != nil {
@@ -106,9 +119,17 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 		return nil
 	}
 
-	r.deleteByIdQuery = func(q *gorm.DB, id uint) error {
+	r.deleteByIdQuery = func(c echo.Context, q *gorm.DB, id uint) error {
 		var result T
-		tx := database.Db.Delete(result, "id = ?", id)
+		tx := database.Db.First(&result, "id = ?", id)
+
+		if r.canDeleteById != nil {
+			if !r.canDeleteById(c, result) {
+				return ErrorNoResourceAccess
+			}
+		}
+
+		database.Db.Delete(&result)
 
 		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return ErrorNoResourceFound
@@ -153,13 +174,6 @@ func (r *Resource[T]) getAll(c echo.Context) error {
 }
 
 func (r *Resource[T]) getById(c echo.Context) error {
-	// Access control check
-	if r.canListById != nil {
-		if !r.canListById(c) {
-			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
-		}
-	}
-
 	// Parse the ID parameter, or fail.
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -167,7 +181,7 @@ func (r *Resource[T]) getById(c echo.Context) error {
 		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidID)
 	}
 
-	m, err := r.listByIdQuery(database.Db, uint(id))
+	m, err := r.listByIdQuery(c, database.Db, uint(id))
 	if err != nil {
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
@@ -180,12 +194,6 @@ func (r *Resource[T]) getById(c echo.Context) error {
 }
 
 func (r *Resource[T]) writeById(c echo.Context) error {
-	if r.canWriteById != nil {
-		if !r.canWriteById(c) {
-			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
-		}
-	}
-
 	// Check that we have a bind type set up already. If not, we must fail the call.
 	if r.writeBindType == nil {
 		log.Error("Cannot write without a bind type set up. Call SetWriteBindType.")
@@ -208,7 +216,7 @@ func (r *Resource[T]) writeById(c echo.Context) error {
 		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidID)
 	}
 
-	err = r.writeByIdQuery(database.Db, uint(id), bound)
+	err = r.writeByIdQuery(c, database.Db, uint(id), bound)
 	if err != nil {
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
@@ -265,12 +273,6 @@ func (r *Resource[T]) create(c echo.Context) error {
 }
 
 func (r *Resource[T]) deleteById(c echo.Context) error {
-	if r.canDeleteById != nil {
-		if !r.canDeleteById(c) {
-			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
-		}
-	}
-
 	// Parse the ID parameter, or fail.
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -278,7 +280,7 @@ func (r *Resource[T]) deleteById(c echo.Context) error {
 		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidID)
 	}
 
-	err = r.deleteByIdQuery(database.Db, uint(id))
+	err = r.deleteByIdQuery(c, database.Db, uint(id))
 	if err != nil {
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
@@ -300,12 +302,12 @@ func (r *Resource[T]) CanListAll(predicate func(c echo.Context) bool) {
 }
 
 // CanListById takes a predicate and determines whether the operation can proceed.
-func (r *Resource[T]) CanListById(predicate func(c echo.Context) bool) {
+func (r *Resource[T]) CanListById(predicate func(c echo.Context, entity T) bool) {
 	r.canListById = predicate
 }
 
 // CanDeleteById takes a predicate and determines whether the operation can proceed.
-func (r *Resource[T]) CanDeleteById(predicate func(c echo.Context) bool) {
+func (r *Resource[T]) CanDeleteById(predicate func(c echo.Context, entity T) bool) {
 	r.canDeleteById = predicate
 }
 
@@ -315,7 +317,7 @@ func (r *Resource[T]) OverrideListAllQuery(predicate func(q *gorm.DB) ([]T, erro
 }
 
 // OverrideListByIdQuery lets consumers override the query used in the "List By Id" operation.
-func (r *Resource[T]) OverrideListByIdQuery(predicate func(q *gorm.DB, id uint) (*T, error)) {
+func (r *Resource[T]) OverrideListByIdQuery(predicate func(c echo.Context, q *gorm.DB, id uint) (*T, error)) {
 	r.listByIdQuery = predicate
 }
 
