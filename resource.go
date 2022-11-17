@@ -50,6 +50,8 @@ type Resource[T any] struct {
 	// Delete by ID operation.
 	canDeleteById   func(c echo.Context, entity T) bool
 	deleteByIdQuery func(c echo.Context, q *gorm.DB, id uint) error
+
+	middlewares []echo.MiddlewareFunc
 }
 
 // Register is called when minimal initializes, and will add routes and trigger the automigration.
@@ -146,11 +148,11 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 	database.AutoMigrate(new(T))
 
 	group := e.Group(r.Name)
-	group.GET("", r.getAll)
-	group.GET("/:id", r.getById)
-	group.PUT("/:id", r.writeById)
-	group.POST("", r.create)
-	group.DELETE("/:id", r.deleteById)
+	group.GET("", r.getAll, r.middlewares...)
+	group.GET("/:id", r.getById, r.middlewares...)
+	group.PUT("/:id", r.writeById, r.middlewares...)
+	group.POST("", r.create, r.middlewares...)
+	group.DELETE("/:id", r.deleteById, r.middlewares...)
 }
 
 func (r *Resource[T]) getAll(c echo.Context) error {
@@ -294,6 +296,10 @@ func (r *Resource[T]) deleteById(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+func (r *Resource[T]) Middlewares(m ...echo.MiddlewareFunc) {
+	r.middlewares = m
 }
 
 // CanListAll takes a predicate and determines whether the operation can proceed.
