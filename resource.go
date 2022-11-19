@@ -189,6 +189,11 @@ func (r *Resource[T]) getById(c echo.Context) error {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
 		}
 
+		// When we don't have access to the resource.
+		if errors.Is(err, ErrorNoResourceAccess) {
+			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
+		}
+
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
@@ -220,12 +225,14 @@ func (r *Resource[T]) writeById(c echo.Context) error {
 
 	err = r.writeByIdQuery(c, database.Db, uint(id), bound)
 	if err != nil {
+		// Tried to write a non existant resource.
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
 		}
 
-		if errors.Is(err, ErrorInvalidData) {
-			return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
+		// When we don't have access to the resource.
+		if errors.Is(err, ErrorNoResourceAccess) {
+			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
 		}
 
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
@@ -284,14 +291,17 @@ func (r *Resource[T]) deleteById(c echo.Context) error {
 
 	err = r.deleteByIdQuery(c, database.Db, uint(id))
 	if err != nil {
+		// Tried to delete a non existant entity.
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, ErrorNoResourceFound)
 		}
 
-		if errors.Is(err, ErrorInvalidData) {
-			return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
+		// When we don't have access to the resource.
+		if errors.Is(err, ErrorNoResourceAccess) {
+			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
 		}
 
+		// Otherwise, send them a 500.
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
@@ -310,6 +320,11 @@ func (r *Resource[T]) CanListAll(predicate func(c echo.Context) bool) {
 // CanListById takes a predicate and determines whether the operation can proceed.
 func (r *Resource[T]) CanListById(predicate func(c echo.Context, entity T) bool) {
 	r.canListById = predicate
+}
+
+// CanWriteById takes a predicate and determines whether the operation can proceed.
+func (r *Resource[T]) CanWriteById(predicate func(c echo.Context, entity T) bool) {
+	r.canWriteById = predicate
 }
 
 // CanDeleteById takes a predicate and determines whether the operation can proceed.
