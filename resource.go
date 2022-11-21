@@ -61,91 +61,103 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 		r.onRegister(e)
 	}
 
-	// Default querying function for list all.
-	r.listAllQuery = func(c echo.Context, q *gorm.DB) ([]T, error) {
-		var result []T
-		q.Find(&result)
+	if r.listAllQuery == nil {
+		// Default querying function for list all.
+		r.listAllQuery = func(c echo.Context, q *gorm.DB) ([]T, error) {
+			var result []T
+			q.Find(&result)
 
-		if q.Error != nil {
-			return nil, ErrorNoResourceFound
-		}
-
-		return result, nil
-	}
-
-	// Default for list by id
-	r.listByIdQuery = func(c echo.Context, q *gorm.DB, id uint) (*T, error) {
-		var result T
-		tx := q.First(&result, "id = ?", id)
-
-		// Access control check
-		if r.canListById != nil {
-			if !r.canListById(c, result) {
-				return nil, ErrorNoResourceAccess
-			}
-		}
-
-		if tx.Error != nil {
-			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			if q.Error != nil {
 				return nil, ErrorNoResourceFound
 			}
 
-			return nil, tx.Error
+			return result, nil
 		}
-
-		return &result, nil
 	}
 
-	r.writeByIdQuery = func(c echo.Context, q *gorm.DB, id uint, new any) error {
-		var result T
-		tx := q.First(&result, "id = ?", id)
+	if r.listByIdQuery == nil {
+		// Default for list by id
+		r.listByIdQuery = func(c echo.Context, q *gorm.DB, id uint) (*T, error) {
+			var result T
+			tx := q.First(&result, "id = ?", id)
 
-		if r.canWriteById != nil {
-			if !r.canWriteById(c, result) {
-				return ErrorNoResourceAccess
+			// Access control check
+			if r.canListById != nil {
+				if !r.canListById(c, result) {
+					return nil, ErrorNoResourceAccess
+				}
 			}
-		}
 
-		_, err := patch.Struct(&result, new)
-		if err != nil {
-			log.Error("Patching failed: ", err)
-			return ErrorInvalidData
-		}
+			if tx.Error != nil {
+				if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+					return nil, ErrorNoResourceFound
+				}
 
-		database.Db.Save(result)
-
-		if tx.Error != nil {
-			return tx.Error
-		}
-
-		return nil
-	}
-
-	r.deleteByIdQuery = func(c echo.Context, q *gorm.DB, id uint) error {
-		var result T
-		tx := database.Db.First(&result, "id = ?", id)
-
-		if r.canDeleteById != nil {
-			if !r.canDeleteById(c, result) {
-				return ErrorNoResourceAccess
+				return nil, tx.Error
 			}
+
+			return &result, nil
 		}
-
-		database.Db.Delete(&result)
-
-		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return ErrorNoResourceFound
-		}
-
-		if tx.Error != nil {
-			return tx.Error
-		}
-
-		return nil
 	}
 
-	log.Info("Initialized resource: ", r.Name)
-	database.AutoMigrate(new(T))
+	if r.writeByIdQuery == nil {
+		r.writeByIdQuery = func(c echo.Context, q *gorm.DB, id uint, new any) error {
+			var result T
+			tx := q.First(&result, "id = ?", id)
+
+			if r.canWriteById != nil {
+				if !r.canWriteById(c, result) {
+					return ErrorNoResourceAccess
+				}
+			}
+
+			_, err := patch.Struct(&result, new)
+			if err != nil {
+				log.Error("Patching failed: ", err)
+				return ErrorInvalidData
+			}
+
+			database.Db.Save(result)
+
+			if tx.Error != nil {
+				return tx.Error
+			}
+
+			return nil
+		}
+	}
+
+	if r.deleteByIdQuery == nil {
+		r.deleteByIdQuery = func(c echo.Context, q *gorm.DB, id uint) error {
+			var result T
+			tx := database.Db.First(&result, "id = ?", id)
+
+			if r.canDeleteById != nil {
+				if !r.canDeleteById(c, result) {
+					return ErrorNoResourceAccess
+				}
+			}
+
+			database.Db.Delete(&result)
+
+			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+				return ErrorNoResourceFound
+			}
+
+			if tx.Error != nil {
+				return tx.Error
+			}
+
+			return nil
+		}
+	}
+
+	if database.Db != nil {
+		log.Info("Initialized resource: ", r.Name)
+		database.AutoMigrate(new(T))
+	} else {
+		log.Info("Uninitialized database, skipping..")
+	}
 
 	group := e.Group(r.Name)
 	group.GET("", r.getAll, r.middlewares...)
