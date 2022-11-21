@@ -333,7 +333,7 @@ func (r *Resource[T]) CanDeleteById(predicate func(c echo.Context, entity T) boo
 }
 
 // OverrideListAllQuery lets consumers override the query used in the "List All" operation.
-func (r *Resource[T]) OverrideListAllQuery(predicate func(q *gorm.DB) ([]T, error)) {
+func (r *Resource[T]) OverrideListAllQuery(predicate func(c echo.Context, q *gorm.DB) ([]T, error)) {
 	r.listAllQuery = predicate
 }
 
