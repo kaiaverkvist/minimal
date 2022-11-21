@@ -32,7 +32,7 @@ type Resource[T any] struct {
 
 	// List ALL operation.
 	canListAll   func(c echo.Context) bool
-	listAllQuery func(q *gorm.DB) ([]T, error)
+	listAllQuery func(c echo.Context, q *gorm.DB) ([]T, error)
 
 	// List by ID operation.
 	canListById   func(c echo.Context, entity T) bool
@@ -62,7 +62,7 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 	}
 
 	// Default querying function for list all.
-	r.listAllQuery = func(q *gorm.DB) ([]T, error) {
+	r.listAllQuery = func(c echo.Context, q *gorm.DB) ([]T, error) {
 		var result []T
 		q.Find(&result)
 
@@ -163,7 +163,7 @@ func (r *Resource[T]) getAll(c echo.Context) error {
 		}
 	}
 
-	m, err := r.listAllQuery(database.Db)
+	m, err := r.listAllQuery(c, database.Db)
 	if err != nil {
 		if errors.Is(err, ErrorNoResourceFound) {
 			return res.FailCode(c, http.StatusNotFound, err)
