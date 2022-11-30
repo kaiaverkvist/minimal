@@ -48,7 +48,7 @@ type Resource[T any] struct {
 	createBindType any
 
 	// Used in case patching is not sufficient for creation of the entity
-	createTransformer func(c echo.Context) T
+	createTransformer func(c echo.Context) (*T, error)
 
 	// Delete by ID operation.
 	canDeleteById   func(c echo.Context, entity T) bool
@@ -266,7 +266,14 @@ func (r *Resource[T]) create(c echo.Context) error {
 	// Patch data onto the structure.
 	var model T
 	if r.createTransformer != nil {
-		model = r.createTransformer(c)
+		transformedModel, err := r.createTransformer(c)
+		if err != nil {
+			return res.FailCode(c, http.StatusBadRequest, err)
+		}
+
+		if transformedModel != nil {
+			model = *transformedModel
+		}
 	} else {
 		// Check that we have a bind type set up already. If not, we must fail the call.
 		if r.createBindType == nil {
