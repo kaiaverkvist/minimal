@@ -47,6 +47,9 @@ type Resource[T any] struct {
 	canCreate      func(c echo.Context) bool
 	createBindType any
 
+	// Used in case patching is not sufficient for creation of the entity
+	createTransformer func(c echo.Context) T
+
 	// Delete by ID operation.
 	canDeleteById   func(c echo.Context, entity T) bool
 	deleteByIdQuery func(c echo.Context, q *gorm.DB, id uint) error
@@ -81,7 +84,6 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 			var result T
 			tx := q.First(&result, "id = ?", id)
 
-			// Access control check
 			if r.canListById != nil {
 				if !r.canListById(c, result) {
 					return nil, ErrorNoResourceAccess
@@ -261,27 +263,31 @@ func (r *Resource[T]) create(c echo.Context) error {
 		}
 	}
 
-	// Check that we have a bind type set up already. If not, we must fail the call.
-	if r.createBindType == nil {
-		log.Error("Cannot write without a bind type set up. Call SetCreateBindType.")
-		return res.FailCode(c, http.StatusInternalServerError, ErrorNoBindType)
-	}
-
-	// Try to instantiate the "DTO" type, and bind to it.
-	boundType := reflect.TypeOf(r.createBindType)
-	boundPtr := reflect.New(boundType)
-	bound := boundPtr.Interface()
-	if err := c.Bind(bound); err != nil {
-		log.Error("Binding failed: ", err)
-		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
-	}
-
 	// Patch data onto the structure.
 	var model T
-	_, err := patch.Struct(&model, bound)
-	if err != nil {
-		log.Error("Patching failed: ", err)
-		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
+	if r.createTransformer != nil {
+		model = r.createTransformer(c)
+	} else {
+		// Check that we have a bind type set up already. If not, we must fail the call.
+		if r.createBindType == nil {
+			log.Error("Cannot write without a bind type set up. Call SetCreateBindType.")
+			return res.FailCode(c, http.StatusInternalServerError, ErrorNoBindType)
+		}
+
+		// Try to instantiate the "DTO" type, and bind to it.
+		boundType := reflect.TypeOf(r.createBindType)
+		boundPtr := reflect.New(boundType)
+		bound := boundPtr.Interface()
+		if err := c.Bind(bound); err != nil {
+			log.Error("Binding failed: ", err)
+			return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
+		}
+
+		_, err := patch.Struct(&model, bound)
+		if err != nil {
+			log.Error("Patching failed: ", err)
+			return res.FailCode(c, http.StatusBadRequest, ErrorInvalidData)
+		}
 	}
 
 	// Finally create.
@@ -362,6 +368,10 @@ func (r *Resource[T]) SetWriteBindType(t any) {
 // SetCreateBindType will typically be a DTO struct.
 func (r *Resource[T]) SetCreateBindType(t any) {
 	r.createBindType = t
+}
+
+func (r *Resource[T]) SetCreateTransformer(tf func(c echo.Context) T) {
+	r.createTransformer = tf
 }
 
 // OnRegister sets the registration hook to argument f.
