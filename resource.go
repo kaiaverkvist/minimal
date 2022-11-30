@@ -377,7 +377,7 @@ func (r *Resource[T]) SetCreateBindType(t any) {
 	r.createBindType = t
 }
 
-func (r *Resource[T]) SetCreateTransformer(tf func(c echo.Context) T) {
+func (r *Resource[T]) SetCreateTransformer(tf func(c echo.Context) (*T, error)) {
 	r.createTransformer = tf
 }
 
