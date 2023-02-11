@@ -378,6 +378,11 @@ func (r *Resource[T]) OverrideListByIdQuery(predicate func(c echo.Context, q *go
 	r.listByIdQuery = predicate
 }
 
+// OverrideDeleteByIdQuery lets consumers override the query used in the "Delete By Id" operation.
+func (r *Resource[T]) OverrideDeleteByIdQuery(predicate func(c echo.Context, q *gorm.DB, id uint) error) {
+	r.deleteByIdQuery = predicate
+}
+
 // SetWriteBindType will typically be a DTO struct.
 func (r *Resource[T]) SetWriteBindType(t any) {
 	r.writeBindType = t
