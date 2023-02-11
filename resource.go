@@ -52,7 +52,7 @@ type Resource[T any] struct {
 
 	// Delete by ID operation.
 	canDeleteById   func(c echo.Context, entity T) bool
-	deleteByIdQuery func(c echo.Context, q *gorm.DB, id uint) error
+	deleteByIdQuery func(c echo.Context, q *gorm.DB, entity T) error
 
 	middlewares []echo.MiddlewareFunc
 }
@@ -133,21 +133,8 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 	}
 
 	if r.deleteByIdQuery == nil {
-		r.deleteByIdQuery = func(c echo.Context, q *gorm.DB, id uint) error {
-			var result T
-			tx := database.Db.First(&result, "id = ?", id)
-
-			if r.canDeleteById != nil {
-				if !r.canDeleteById(c, result) {
-					return ErrorNoResourceAccess
-				}
-			}
-
-			tx2 := database.Db.Delete(&result)
-
-			if tx2.Error != nil {
-				return tx2.Error
-			}
+		r.deleteByIdQuery = func(c echo.Context, q *gorm.DB, entity T) error {
+			tx := database.Db.Delete(&entity)
 
 			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 				return ErrorNoResourceFound
@@ -324,7 +311,19 @@ func (r *Resource[T]) deleteById(c echo.Context) error {
 		return res.FailCode(c, http.StatusBadRequest, ErrorInvalidID)
 	}
 
-	err = r.deleteByIdQuery(c, database.Db, uint(id))
+	var result T
+	tx := database.Db.First(&result, "id = ?", id)
+	if tx.Error != nil {
+		err = tx.Error
+	}
+
+	if r.canDeleteById != nil {
+		if !r.canDeleteById(c, result) {
+			return ErrorNoResourceAccess
+		}
+	}
+
+	err = r.deleteByIdQuery(c, database.Db, result)
 	if err != nil {
 		// Tried to delete a non existant entity.
 		if errors.Is(err, ErrorNoResourceFound) {
@@ -379,7 +378,7 @@ func (r *Resource[T]) OverrideListByIdQuery(predicate func(c echo.Context, q *go
 }
 
 // OverrideDeleteByIdQuery lets consumers override the query used in the "Delete By Id" operation.
-func (r *Resource[T]) OverrideDeleteByIdQuery(predicate func(c echo.Context, q *gorm.DB, id uint) error) {
+func (r *Resource[T]) OverrideDeleteByIdQuery(predicate func(c echo.Context, q *gorm.DB, entity T) error) {
 	r.deleteByIdQuery = predicate
 }
 
