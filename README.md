@@ -44,7 +44,7 @@ func (br *BaseRoutes) Register(e *echo.Echo) {
 Instead of using `c.JSON`, you can use the `res` package which wraps your data type in a general success and failure struct.
 
 ## Auto-generated API Resource
-The snippet below will set up
+The snippet below will set up a REST endpoint that has CRUD operations on the Test model.
 ````go
 type UpdateTest struct {
 	Name        string
