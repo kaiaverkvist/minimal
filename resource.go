@@ -68,9 +68,9 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 		// Default querying function for list all.
 		r.listAllQuery = func(c echo.Context, q *gorm.DB) ([]T, error) {
 			var result []T
-			q.Find(&result)
+			tx := q.Find(&result)
 
-			if q.Error != nil {
+			if tx.Error != nil {
 				return nil, ErrorNoResourceFound
 			}
 
@@ -119,7 +119,10 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 				return ErrorInvalidData
 			}
 
-			database.Db.Save(result)
+			tx2 := database.Db.Save(result)
+			if tx2.Error != nil {
+				return tx.Error
+			}
 
 			if tx.Error != nil {
 				return tx.Error
@@ -140,7 +143,15 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 				}
 			}
 
-			database.Db.Delete(&result)
+			tx2 := database.Db.Delete(&result)
+
+			if errors.Is(tx2.Error, gorm.ErrRecordNotFound) {
+				return ErrorNoResourceFound
+			}
+
+			if tx2.Error != nil {
+				return tx2.Error
+			}
 
 			if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 				return ErrorNoResourceFound
