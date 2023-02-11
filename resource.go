@@ -121,7 +121,7 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 
 			tx2 := database.Db.Save(result)
 			if tx2.Error != nil {
-				return tx.Error
+				return tx2.Error
 			}
 
 			if tx.Error != nil {
@@ -144,10 +144,6 @@ func (r *Resource[T]) Register(e *echo.Echo) {
 			}
 
 			tx2 := database.Db.Delete(&result)
-
-			if errors.Is(tx2.Error, gorm.ErrRecordNotFound) {
-				return ErrorNoResourceFound
-			}
 
 			if tx2.Error != nil {
 				return tx2.Error
@@ -194,6 +190,7 @@ func (r *Resource[T]) getAll(c echo.Context) error {
 			return res.FailCode(c, http.StatusNotFound, err)
 		}
 
+		log.Errorf("Could not list all for resource %s: %s", reflect.TypeOf(r), err)
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
@@ -219,6 +216,7 @@ func (r *Resource[T]) getById(c echo.Context) error {
 			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
 		}
 
+		log.Errorf("Could not get by id for resource %s: %s", reflect.TypeOf(r), err)
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
@@ -260,6 +258,7 @@ func (r *Resource[T]) writeById(c echo.Context) error {
 			return res.FailCode(c, http.StatusForbidden, ErrorNoResourceAccess)
 		}
 
+		log.Errorf("Could not write by id for resource %s: %s", reflect.TypeOf(r), err)
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
@@ -338,6 +337,7 @@ func (r *Resource[T]) deleteById(c echo.Context) error {
 		}
 
 		// Otherwise, send them a 500.
+		log.Errorf("Could not delete by id for resource %s: %s", reflect.TypeOf(r), err)
 		return res.FailCode(c, http.StatusInternalServerError, ErrorDatabase)
 	}
 
